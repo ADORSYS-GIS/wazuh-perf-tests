@@ -1,0 +1,64 @@
+{
+  "report_title": "Performance Test Report",
+  "timestamp": "2025-12-09T14:30:00Z",
+  "test_suites": [
+    {
+      "name": "Stress CPU Tests",
+      "status": "passed",
+      "duration": 120.5,
+      "test_cases": [
+        {
+          "name": "CPU_Load_Scenario_1",
+          "status": "passed",
+          "duration": 60.2
+        },
+        {
+          "name": "CPU_Load_Scenario_2",
+          "status": "passed",
+          "duration": 58.1
+        },
+        {
+          "name": "CPU_Load_Scenario_3_failure",
+          "status": "failed",
+          "duration": 2.2,
+          "error_message": "AssertionError: CPU utilization exceeded threshold"
+        }
+      ]
+    },
+    {
+      "name": "Network Delay Tests",
+      "status": "passed",
+      "duration": 80.0,
+      "test_cases": [
+        {
+          "name": "Network_Delay_Scenario_1",
+          "status": "passed",
+          "duration": 40.0
+        },
+        {
+          "name": "Network_Delay_Scenario_2",
+          "status": "passed",
+          "duration": 39.5
+        }
+      ]
+    },
+    {
+      "name": "Log Generator Tests",
+      "status": "failed",
+      "duration": 30.0,
+      "test_cases": [
+        {
+          "name": "Log_Rate_Scenario_1",
+          "status": "passed",
+          "duration": 15.0
+        },
+        {
+          "name": "Log_Rate_Scenario_2_failure",
+          "status": "failed",
+          "duration": 14.0,
+          "error_message": "ValueError: Log rate dropped below expected"
+        }
+      ]
+    }
+  ]
+}
