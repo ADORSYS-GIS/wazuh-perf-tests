@@ -4,6 +4,8 @@ resource "kubernetes_job" "cpu_stress" {
     namespace = var.namespace
   }
 
+  wait_for_completion = false
+
   spec {
     template {
       metadata {
@@ -15,6 +17,7 @@ resource "kubernetes_job" "cpu_stress" {
         container {
           name    = "stress"
           image   = var.config.image
+          command = ["stress"]
           args    = var.config.args
         }
         restart_policy = "Never"

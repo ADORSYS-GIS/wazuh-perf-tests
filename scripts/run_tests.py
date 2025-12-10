@@ -33,17 +33,29 @@ def wait_for_jobs_to_complete(namespace, job_names):
 
 def collect_results(namespace, job_names):
     """
-    Collects results from the test jobs.
-    
-    This is a mock implementation. In a real-world scenario, this function
-    would fetch logs from the pods of each completed job, parse them, and
-    generate the results dynamically.
+    Collects results from the test jobs by fetching logs from their pods.
     """
-    print("Generating mock test_results.json...")
-    # In a real implementation, you would build this JSON from the logs of the test pods.
-    # For now, we'll just use the existing enriched file as a template.
-    with open("test_results.json", "r") as f:
-        return json.load(f)
+    config.load_kube_config()
+    api = client.CoreV1Api()
+    all_results = {}
+
+    for job_name in job_names:
+        print(f"Collecting results for job: {job_name}")
+        pod_list = api.list_namespaced_pod(namespace=namespace, label_selector=f"job-name={job_name}")
+        job_pods_logs = {}
+        for pod in pod_list.items:
+            try:
+                # Assuming the job pods have only one container or we care about the first one
+                pod_log = api.read_namespaced_pod_log(name=pod.metadata.name, namespace=namespace)
+                job_pods_logs[pod.metadata.name] = pod_log
+                print(f"  - Collected logs from pod: {pod.metadata.name}")
+            except client.ApiException as e:
+                print(f"  - Could not retrieve logs for pod {pod.metadata.name}: {e}")
+        all_results[job_name] = job_pods_logs
+    
+    # In a real implementation, you would parse these logs to extract metrics.
+    # For now, we'll return the raw logs.
+    return all_results
 
 def main():
     """Main function to orchestrate the performance tests."""
@@ -64,21 +76,12 @@ def main():
     print("Collecting results...")
     results_data = collect_results(namespace, job_names)
     
-    with open(project_root / "test_results_final.json", "w") as f:
+    with open(project_root / "output/test_results.json", "w") as f:
         json.dump(results_data, f, indent=2)
 
     # 4. Generate HTML report
     print("Generating HTML report...")
     # The generate_report.py script expects 'test_results.json' in the current working directory.
-    # We will rename our final results to that before running the report generator.
-    final_results_path = project_root / "test_results_final.json"
-    target_results_path = project_root / "test_results.json"
-
-    if target_results_path.exists():
-        os.rename(target_results_path, project_root / "test_results.json.bak")
-        print(f"Backed up existing '{target_results_path.name}' to '{target_results_path.name}.bak'")
-
-    os.rename(final_results_path, target_results_path)
     run_command(["python3", str(project_root / "scripts" / "generate_report.py")], cwd=project_root)
 
     print("\nPerformance test run complete.")

@@ -5,7 +5,12 @@ resource "kubernetes_config_map" "loggen_script" {
   }
 
   data = {
-    "loggen.py" = var.config.log_script_content
+    "loggen.py" = <<EOF
+import time
+while True:
+    print('Generating logs...')
+    time.sleep(1)
+EOF
   }
 }
 
@@ -41,7 +46,7 @@ resource "kubernetes_deployment" "wazuh_log_generator" {
         volume {
           name = "loggen-script-volume"
           config_map {
-            name = kubernetes_config_map.loggen_script.metadata.name
+            name = kubernetes_config_map.loggen_script.metadata[0].name
           }
         }
       }

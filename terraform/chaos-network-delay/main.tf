@@ -16,7 +16,7 @@ resource "kubernetes_manifest" "network_chaos" {
         namespaces = [
           var.config.target_namespace
         ]
-        labelSelectors = var.config.pod_selector_labels
+        labelSelectors = length(var.config.pod_selector_labels) > 0 ? var.config.pod_selector_labels : null
       }
       delay = {
         latency = var.config.delay_duration
