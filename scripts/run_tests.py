@@ -1,9 +1,9 @@
 import subprocess
 import time
 import json
-import os
 from kubernetes import client, config, watch
 from pathlib import Path
+import os
 
 def run_command(command, cwd=None):
     """Executes a command and returns its output."""
@@ -48,20 +48,11 @@ def collect_results(namespace, job_names):
 def main():
     """Main function to orchestrate the performance tests."""
     # 1. Initialize and apply Terraform configuration
-    print("Initializing Terraform...")
+    # Terraform operations are now handled by the Makefile.
+    # Ensure 'terraform-init' and 'terraform-apply' have been run prior to executing this script.
+
     current_script_dir = Path(__file__).parent
     project_root = current_script_dir.parent
-
-    # Change to project root for terraform commands
-    os.chdir(project_root)
-
-    run_command(["terraform", "init"], cwd=project_root)
-    print("Applying Terraform configuration to start test jobs...")
-    run_command(["terraform", "apply", "-auto-approve"], cwd=project_root)
-
-    # Note: Subsequent file operations will now need to explicitly use paths relative to the project root
-    # or ensure os.chdir is managed carefully. For now, we'll assume relative paths work from project_root
-    # or that the scripts handle their own pathing correctly.
 
     # 2. Wait for jobs to complete
     namespace = "tests"
@@ -73,20 +64,22 @@ def main():
     print("Collecting results...")
     results_data = collect_results(namespace, job_names)
     
-    with open("test_results_final.json", "w") as f:
+    with open(project_root / "test_results_final.json", "w") as f:
         json.dump(results_data, f, indent=2)
 
     # 4. Generate HTML report
     print("Generating HTML report...")
-    # We assume generate_report.py is in the same directory
-    # and it reads from a file named 'test_results.json'
-    # so we will rename our final results to that.
-    if os.path.exists("test_results.json"):
-        os.rename("test_results.json", "test_results.json.bak")
-        print("Backed up existing 'test_results.json' to 'test_results.json.bak'")
+    # The generate_report.py script expects 'test_results.json' in the current working directory.
+    # We will rename our final results to that before running the report generator.
+    final_results_path = project_root / "test_results_final.json"
+    target_results_path = project_root / "test_results.json"
 
-    os.rename("test_results_final.json", "test_results.json")
-    run_command(["python3", "./generate_report.py"])
+    if target_results_path.exists():
+        os.rename(target_results_path, project_root / "test_results.json.bak")
+        print(f"Backed up existing '{target_results_path.name}' to '{target_results_path.name}.bak'")
+
+    os.rename(final_results_path, target_results_path)
+    run_command(["python3", str(project_root / "scripts" / "generate_report.py")], cwd=project_root)
 
     print("\nPerformance test run complete.")
     print("Report is in the 'test_report' directory.")
