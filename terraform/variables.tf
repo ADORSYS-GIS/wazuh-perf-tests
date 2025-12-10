@@ -16,11 +16,6 @@ variable "namespace" {
   default     = "default"
 }
 
-variable "namespace" {
-  description = "Kubernetes namespace to deploy the test resources."
-  type        = string
-  default     = "tests"
-}
 
 variable "enable_wazuh_log_generator" {
   description = "Enable the Wazuh Log Generator sub-module"
