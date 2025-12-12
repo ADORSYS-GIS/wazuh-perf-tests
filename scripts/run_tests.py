@@ -72,40 +72,31 @@ def wait_for_resources_to_be_ready(namespace, job_names=None, deployment_names=N
                 raise TimeoutError(f"Deployment '{deployment_name}' did not become ready in {timeout} seconds.")
 
 
-def collect_logs(namespace, job_names=None, deployment_names=None):
+def collect_logs(workloads):
     """
-    Collects logs from specified jobs and deployments by fetching logs from their pods.
+    Collects logs from specified workloads (jobs and deployments) by fetching logs from their pods.
+    Each workload in the list should be a dictionary with 'name', 'selector', and 'namespace'.
     """
     config.load_kube_config()
     api = client.CoreV1Api()
     all_results = {}
 
-    workloads = []
-    if job_names:
-        for name in job_names:
-            workloads.append({"name": name, "selector": f"job-name={name}"})
-    if deployment_names:
-        for name in deployment_names:
-            workloads.append({"name": name, "selector": f"app={name}"})
-    
-    # Add Wazuh pods to the list of workloads to collect logs from
-    # Assuming Wazuh pods have a label 'app=wazuh' or similar.
-    # This might need adjustment based on actual Wazuh deployment labels.
-    wazuh_pod_selector = "app=wazuh" # Placeholder, adjust if needed
-    workloads.append({"name": "wazuh-pods", "selector": wazuh_pod_selector})
-
     for workload in workloads:
-        print(f"Collecting logs for: {workload['name']}")
-        pod_list = api.list_namespaced_pod(namespace=namespace, label_selector=workload['selector'])
+        name = workload['name']
+        selector = workload['selector']
+        namespace = workload['namespace']
+        
+        print(f"Collecting logs for: {name} in namespace {namespace} with selector {selector}")
+        pod_list = api.list_namespaced_pod(namespace=namespace, label_selector=selector)
         logs = ""
         for pod in pod_list.items:
             try:
                 pod_log = api.read_namespaced_pod_log(name=pod.metadata.name, namespace=namespace)
                 logs += pod_log
-                print(f"  - Collected logs from pod: {pod.metadata.name}")
+                print(f"  - Collected {len(pod_log.splitlines())} lines from pod: {pod.metadata.name}")
             except client.ApiException as e:
                 print(f"  - Could not retrieve logs for pod {pod.metadata.name}: {e}")
-        all_results[workload['name']] = logs
+        all_results[name] = logs
 
     return all_results
 
@@ -140,22 +131,38 @@ def parse_results_to_report_format(raw_results, test_duration):
 
     # --- REPORTING FOR NETWORK CHAOS TEST ---
     # --- PARSING LOGIC FOR WAZUH POD LOGS ---
-    if "wazuh-pods" in raw_results:
-        logs = raw_results["wazuh-pods"].strip().split('\n')
-        total_wazuh_logs = len([l for l in logs if l])
+    wazuh_component_logs = {k: v for k, v in raw_results.items() if k.startswith("wazuh-helm-")}
+    
+    total_wazuh_logs_collected = 0
+    wazuh_test_cases = []
+    
+    for component_name, logs_content in wazuh_component_logs.items():
+        logs = logs_content.strip().split('\n')
+        component_log_count = len([l for l in logs if l])
+        total_wazuh_logs_collected += component_log_count
         
-        # Placeholder for actual Wazuh log parsing and metric extraction
-        # This would involve parsing Wazuh specific log formats (e.g., JSON, syslog)
-        # and extracting relevant metrics like alerts, events, etc.
-        wazuh_metrics = {"total_logs_collected": total_wazuh_logs}
+        component_status = "passed" if component_log_count > 0 else "failed"
+        component_error_msg = f"No logs collected for {component_name}." if component_log_count == 0 else ""
         
-        status = "passed" if total_wazuh_logs > 0 else "failed"
-        error_msg = "No Wazuh logs collected." if total_wazuh_logs == 0 else ""
-        
-        test_suites.append({
-            "name": "Wazuh Pod Log Collection", "status": status, "duration": test_duration,
-            "test_cases": [{"name": "Verify Wazuh log collection", "status": status, "duration": test_duration, "metrics": wazuh_metrics, "error_message": error_msg}]
+        wazuh_test_cases.append({
+            "name": f"Verify log collection for {component_name}",
+            "status": component_status,
+            "duration": test_duration,
+            "metrics": {"logs_collected": component_log_count},
+            "error_message": component_error_msg
         })
+
+    overall_wazuh_status = "passed" if total_wazuh_logs_collected > 0 else "failed"
+    overall_wazuh_error_msg = "No Wazuh logs collected from any component." if total_wazuh_logs_collected == 0 else ""
+
+    test_suites.append({
+        "name": "Wazuh Pod Log Collection",
+        "status": overall_wazuh_status,
+        "duration": test_duration,
+        "test_cases": wazuh_test_cases,
+        "metrics": {"total_wazuh_logs_collected": total_wazuh_logs_collected},
+        "error_message": overall_wazuh_error_msg
+    })
 
     # --- REPORTING FOR NETWORK CHAOS TEST ---
     test_suites.append({
@@ -201,7 +208,18 @@ def main():
         
         print("\n--- Collecting and Parsing Results ---")
         # Collect logs from cpu-stress job and Wazuh pods
-        raw_results = collect_logs(namespace="tests", job_names=["cpu-stress"], deployment_names=[])
+        # Define workloads for log collection with their respective namespaces
+        workloads_to_collect = [
+            {"name": "cpu-stress", "selector": "app=cpu-stress", "namespace": "tests"},
+            {"name": "wazuh-helm-dashboard", "selector": "app=wazuh-helm-dashboard", "namespace": "wazuh"},
+            {"name": "wazuh-helm-indexer", "selector": "app=wazuh-helm-indexer", "namespace": "wazuh"},
+            {"name": "wazuh-helm-manager", "selector": "app=wazuh-helm-manager", "namespace": "wazuh"},
+        ]
+        raw_results = collect_logs(workloads_to_collect)
+        
+        # Add a small delay to ensure logs are available after job completion
+        print("Waiting 30 seconds for logs to become available...")
+        time.sleep(30)
         
         report_data = parse_results_to_report_format(raw_results, test_duration_seconds)
         
@@ -220,8 +238,7 @@ def main():
         print("\n--- Destroying Terraform Resources ---")
         # To prevent accidental resource leakage during development, it's safer to run destroy manually for now.
         # When ready, uncomment the line below.
-        # run_command(["terraform", "destroy", "-auto-approve"], cwd=terraform_dir)
-        print("Skipping terraform destroy for now. Run 'make terraform-destroy' to clean up.")
+        run_command(["terraform", "destroy", "-auto-approve"], cwd=terraform_dir)
 
 if __name__ == "__main__":
     main()

@@ -1,9 +1,7 @@
 import json
 import os
 import sys
-import matplotlib.pyplot as plt
-import io
-import base64
+from pathlib import Path
 
 def generate_html_report(data, output_dir="test_report"):
     os.makedirs(output_dir, exist_ok=True)
@@ -148,8 +146,8 @@ if __name__ == "__main__":
         with open(results_file[1], "r") as f:
             test_data = json.load(f)
 
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        output_dir = os.path.join(script_dir, "test_report")
+        current_script_dir = Path(__file__).parent
+        output_dir = os.path.join(current_script_dir.parent, "output", "test_report")
 
         generate_html_report(test_data, output_dir=output_dir)
 

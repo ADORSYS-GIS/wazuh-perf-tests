@@ -31,6 +31,7 @@ resource "helm_release" "chaos_mesh" {
   create_namespace = true
   version          = "2.6.3" # Pinning version for stability
   wait             = true
+  timeout          = 600
 
   set {
     name  = "chaosDaemon.runtime"
@@ -39,19 +40,12 @@ resource "helm_release" "chaos_mesh" {
   
   set {
     name  = "chaosDaemon.socketPath"
-    value = "/run/containerd/containerd.sock"
-  }
-}
-
-resource "null_resource" "wait_for_chaos_mesh" {
-  depends_on = [helm_release.chaos_mesh]
-
-  provisioner "local-exec" {
-    command = "kubectl wait --for=condition=Available deployment/chaos-mesh-controller-manager -n chaos-mesh --timeout=300s && until kubectl get pods -n chaos-mesh -l app.kubernetes.io/component=chaos-daemon --field-selector=status.phase=Running --no-headers | grep 'Running'; do echo 'Waiting for chaos-daemon pods to be running...' && sleep 10; done && sleep 30"
+    value = "/var/run/k3s/containerd/containerd.sock"
   }
 
-  triggers = {
-    release_name = helm_release.chaos_mesh.name
+  set {
+    name  = "debug"
+    value = "true"
   }
 }
 
@@ -77,7 +71,7 @@ module "chaos_network_delay" {
   namespace = kubernetes_namespace.tests.metadata[0].name
   config    = var.chaos_network_delay_config
 
-  depends_on = [null_resource.wait_for_chaos_mesh]
+  depends_on = [helm_release.chaos_mesh]
 }
 
 output "namespace_name" {
