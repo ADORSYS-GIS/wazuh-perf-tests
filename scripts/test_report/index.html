@@ -1,0 +1,89 @@
+
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Wazuh Performance Test Report</title>
+        <link rel="stylesheet" href="style.css">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Wazuh Performance Test Report</h1>
+            <div class="summary">
+                <p><strong>Test Run ID:</strong> run-1765508913</p>
+                <p><strong>Generated On:</strong> 2025-12-12T04:08:33.588735</p>
+                <h3>Environment</h3>
+                <ul>
+                    <li><strong>OS:</strong> Linux</li>
+                    <li><strong>CPU:</strong> Dynamic</li>
+                    <li><strong>Memory:</strong> Dynamic</li>
+                </ul>
+                <h3>Test Parameters</h3>
+                <ul>
+                    <li><strong>Duration (minutes):</strong> 2.0</li>
+                </ul>
+            </div>
+    
+        <div class="chart-container">
+            <h2>Test Case Summary</h2>
+            <canvas id="testCaseChart"></canvas>
+        </div>
+        <script>
+            var ctx = document.getElementById('testCaseChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Passed', 'Failed'],
+                    datasets: [{
+                        label: 'Test Cases',
+                        data: [1, 2],
+                        backgroundColor: ['#28a745', '#dc3545']
+                    }]
+                },
+                options: { responsive: true, scales: { y: { beginAtZero: true } } }
+            });
+        </script>
+    
+            <div class="test-suite">
+                <h3>Test Suite: CPU Stress Test <span class="status-failed">FAILED</span> (Duration: 120.00s)</h3>
+                <div class="details">
+        
+                    <div class="test-case failed">
+                        <p><strong>Test Case:</strong> Parse CPU Stress Results</p>
+                        <p><strong>Status:</strong> <span class="status-failed">FAILED</span></p>
+                        <p><strong>Duration:</strong> 120.00s</p>
+                        <div class="metrics">
+            
+                        </div>
+            
+                        <pre class="error-message">Error: Failed to parse JSON. Last log line: unable to retrieve container logs for containerd://6ea1122972c568a976fc658a93f249599aa458f9e7bf6bf1b463dd7248940061</pre>
+                </div></div></div>
+            <div class="test-suite">
+                <h3>Test Suite: Wazuh Pod Log Collection <span class="status-failed">FAILED</span> (Duration: 120.00s)</h3>
+                <div class="details">
+        
+                    <div class="test-case failed">
+                        <p><strong>Test Case:</strong> Verify Wazuh log collection</p>
+                        <p><strong>Status:</strong> <span class="status-failed">FAILED</span></p>
+                        <p><strong>Duration:</strong> 120.00s</p>
+                        <div class="metrics">
+                        <p><strong>Total Logs Collected:</strong> 0</p>
+
+                        </div>
+            
+                        <pre class="error-message">Error: No Wazuh logs collected.</pre>
+                </div></div></div>
+            <div class="test-suite">
+                <h3>Test Suite: Network Delay Chaos Test <span class="status-passed">PASSED</span> (Duration: 60.00s)</h3>
+                <div class="details">
+        
+                    <div class="test-case passed">
+                        <p><strong>Test Case:</strong> Inject 100ms network delay</p>
+                        <p><strong>Status:</strong> <span class="status-passed">PASSED</span></p>
+                        <p><strong>Duration:</strong> 60.00s</p>
+                        <div class="metrics">
+            
+                        </div>
+            </div></div></div></div></body></html>

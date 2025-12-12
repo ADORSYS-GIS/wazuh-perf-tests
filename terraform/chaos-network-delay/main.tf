@@ -1,6 +1,4 @@
 resource "kubernetes_manifest" "network_chaos" {
-  depends_on = [] # Placeholder for potential future dependencies
-
 
   manifest = {
     apiVersion = "chaos-mesh.org/v1alpha1"

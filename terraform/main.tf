@@ -30,7 +30,7 @@ resource "helm_release" "chaos_mesh" {
   namespace        = "chaos-mesh"
   create_namespace = true
   version          = "2.6.3" # Pinning version for stability
-  wait             = false
+  wait             = true
 
   set {
     name  = "chaosDaemon.runtime"
@@ -43,10 +43,16 @@ resource "helm_release" "chaos_mesh" {
   }
 }
 
-resource "time_sleep" "wait_for_chaos_mesh" {
+resource "null_resource" "wait_for_chaos_mesh" {
   depends_on = [helm_release.chaos_mesh]
 
-  create_duration = "60s"
+  provisioner "local-exec" {
+    command = "kubectl wait --for=condition=Available deployment/chaos-mesh-controller-manager -n chaos-mesh --timeout=300s && until kubectl get pods -n chaos-mesh -l app.kubernetes.io/component=chaos-daemon --field-selector=status.phase=Running --no-headers | grep 'Running'; do echo 'Waiting for chaos-daemon pods to be running...' && sleep 10; done && sleep 30"
+  }
+
+  triggers = {
+    release_name = helm_release.chaos_mesh.name
+  }
 }
 
 resource "kubernetes_namespace" "tests" {
@@ -55,13 +61,6 @@ resource "kubernetes_namespace" "tests" {
   }
 }
 
-module "wazuh_log_generator" {
-  count  = var.enable_wazuh_log_generator ? 1 : 0
-  source = "./wazuh-log-generator"
-
-  namespace = kubernetes_namespace.tests.metadata[0].name
-  config    = var.wazuh_log_generator_config
-}
 
 module "stress_cpu" {
   count  = var.enable_stress_cpu ? 1 : 0
@@ -78,7 +77,7 @@ module "chaos_network_delay" {
   namespace = kubernetes_namespace.tests.metadata[0].name
   config    = var.chaos_network_delay_config
 
-  depends_on = [time_sleep.wait_for_chaos_mesh]
+  depends_on = [null_resource.wait_for_chaos_mesh]
 }
 
 output "namespace_name" {

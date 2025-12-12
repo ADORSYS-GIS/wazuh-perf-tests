@@ -1,7 +1,7 @@
 variable "kube_config_path" {
   description = "Path to the Kubernetes config file. Can be set with KUBE_CONFIG_PATH environment variable."
   type        = string
-  default     = "~/.kube/config"
+  default     = "~/.kube/k3s.yaml"
 }
 
 variable "kube_config_context" {
@@ -17,11 +17,6 @@ variable "namespace" {
 }
 
 
-variable "enable_wazuh_log_generator" {
-  description = "Enable the Wazuh Log Generator sub-module"
-  type        = bool
-  default     = false
-}
 
 variable "enable_stress_cpu" {
   description = "Enable the Stress CPU sub-module"
@@ -52,8 +47,9 @@ variable "stress_cpu_config" {
   description = "Configuration for the Stress CPU sub-module"
   type = object(
     {
-      image          = optional(string, "polinux/stress")
-      args           = optional(list(string), ["--cpu", "1", "--timeout", "60s"])
+      image          = optional(string, "python:3.9-slim-buster")
+      command        = optional(list(string), ["python", "/app/stress_script.py"])
+      args           = optional(list(string), ["1", "60"]) # cpu_count, timeout_seconds
       back_off_limit = optional(number, 0)
     }
   )
