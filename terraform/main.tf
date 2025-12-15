@@ -44,7 +44,9 @@ module "chaos_network_delay" {
   source = "./chaos-network-delay"
 
   namespace = kubernetes_namespace.tests.metadata[0].name
-  config    = var.chaos_network_delay_config
+  latency  = var.chaos_network_delay_config.delay_duration
+  duration = "60s" # This was not in the config, so I'll hardcode it for now.
+  target_namespace = var.chaos_network_delay_config.target_namespace
 
   depends_on = [helm_release.chaos_mesh]
 }

@@ -1,16 +1,35 @@
 variable "namespace" {
-  description = "Kubernetes namespace to deploy the NetworkChaos resource."
+  description = "The namespace to deploy the chaos experiment to."
   type        = string
+  default     = "tests"
 }
 
-variable "config" {
-  description = "Optional configuration for the NetworkChaos resource."
-  type = object(
-    {
-      target_namespace    = optional(string, "wazuh")
-      pod_selector_labels = optional(map(string), {})
-      delay_duration      = optional(string, "100ms")
-    }
-  )
-  default = {}
+variable "target_namespace" {
+  description = "The namespace to run the chaos experiment against."
+  type        = string
+  default     = "wazuh"
+}
+
+variable "release_name" {
+  description = "The name of the helm release."
+  type        = string
+  default     = "chaos-mesh"
+}
+
+variable "latency" {
+  description = "The latency to inject."
+  type        = string
+  default     = "100ms"
+}
+
+variable "duration" {
+  description = "The duration of the chaos experiment."
+  type        = string
+  default     = "60s"
+}
+
+variable "enable_chaos_service_account" {
+  description = "Enable the creation of a service account for chaos mesh."
+  type        = bool
+  default     = false
 }
