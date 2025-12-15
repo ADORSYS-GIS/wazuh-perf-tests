@@ -8,9 +8,6 @@ def run_stress_test(cpu_count, timeout_seconds):
     
     # Run the stress command in a subprocess
     try:
-        # Using 'stress-ng' for more control and better reporting if available,
-        # otherwise fallback to 'stress'. Assuming 'stress-ng' is preferred.
-        # For simplicity, let's stick to 'stress' as per original.
         command = ["stress", "--cpu", str(cpu_count), "--timeout", f"{timeout_seconds}s"]
         
         # Execute the command and capture output/errors
@@ -33,11 +30,6 @@ def run_stress_test(cpu_count, timeout_seconds):
         duration = time.time() - start_time
         error_message = "Stress command not found. Ensure 'stress' is installed in the container."
         print(f"Error: {error_message}", file=sys.stderr)
-    
-    # For a simple stress test, latency isn't directly measured by 'stress' itself.
-    # We can report the duration of the stress period.
-    # If we were testing an application *under* stress, we'd measure its latency.
-    # For now, we'll just report the duration of the stress process.
     
     metrics = {
         "test_name": "cpu_stress_test",

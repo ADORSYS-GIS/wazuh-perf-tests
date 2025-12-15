@@ -1,28 +1,3 @@
-terraform {
-  required_providers {
-    kubernetes = {
-      source = "hashicorp/kubernetes"
-      version = "~> 2.0"
-    }
-    helm = {
-      source  = "hashicorp/helm"
-      version = "~> 2.0"
-    }
-  }
-}
-
-provider "kubernetes" {
-  config_path    = var.kube_config_path
-  config_context = var.kube_config_context
-}
-
-provider "helm" {
-  kubernetes {
-    config_path    = var.kube_config_path
-    config_context = var.kube_config_context
-  }
-}
-
 resource "helm_release" "chaos_mesh" {
   name             = "chaos-mesh"
   repository       = "https://charts.chaos-mesh.org"
@@ -30,17 +5,17 @@ resource "helm_release" "chaos_mesh" {
   namespace        = "chaos-mesh"
   create_namespace = true
   version          = "2.6.3" # Pinning version for stability
-  wait             = true
+  wait             = false
   timeout          = 600
 
   set {
     name  = "chaosDaemon.runtime"
-    value = "containerd"
+    value = var.chaos_daemon_runtime
   }
-  
+
   set {
     name  = "chaosDaemon.socketPath"
-    value = "/var/run/k3s/containerd/containerd.sock"
+    value = var.chaos_daemon_socket_path
   }
 
   set {
