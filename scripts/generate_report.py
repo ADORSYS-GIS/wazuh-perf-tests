@@ -138,7 +138,7 @@ if __name__ == "__main__":
         current_script_dir = Path(__file__).parent
         output_dir = current_script_dir.parent / "output" / "test_report"
         
-        generate_html_report(test_data, output_dir=output_dir)
+        generate_html_report(test_data, output_dir=output_dir.as_posix())
 
     except FileNotFoundError:
         print(f"Error: {results_file} not found.")

@@ -2,7 +2,6 @@ import subprocess
 import time
 import json
 from pathlib import Path
-import os
 import datetime
 from kubernetes import client, config
 import sys
@@ -121,7 +120,13 @@ def get_chaos_test_status(kubeconfig=None, context=None):
             name="network-delay-chaos"
         )
         
-        status = chaos_object.get("status", {}).get("experiment", {}).get("phase", "Unknown")
+        status = "Unknown"
+        if isinstance(chaos_object, dict):
+            status_dict = chaos_object.get("status")
+            if isinstance(status_dict, dict):
+                experiment_dict = status_dict.get("experiment")
+                if isinstance(experiment_dict, dict):
+                    status = experiment_dict.get("phase", "Unknown")
         if status == "Finished":
             return {"status": "passed", "error_message": ""}
         else:

@@ -1,7 +1,7 @@
 variable "kube_config_path" {
   description = "Path to the Kubernetes config file. Can be set with KUBE_CONFIG_PATH environment variable."
   type        = string
-  default     = "~/.kube/config"
+  default     = "~/.kube/k3s.yaml"
 }
 
 variable "kube_config_context" {
