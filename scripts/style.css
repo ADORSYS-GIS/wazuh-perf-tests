@@ -1,0 +1,17 @@
+body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+.container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
+h1, h2, h3 { color: #0056b3; }
+h2, h3 { border-bottom: 1px solid #eee; padding-bottom: 5px; }
+.summary, .test-suite { margin-bottom: 20px; border: 1px solid #ddd; border-radius: 5px; background-color: #f9f9f9; }
+.summary p, .summary ul, .test-suite h3 { padding: 10px; margin: 0; }
+.summary ul { list-style: none; padding-left: 0; }
+.test-suite h3 { background-color: #d1ecf1; }
+.details { padding: 10px; }
+.test-case { margin-bottom: 10px; padding: 8px; border-left: 5px solid; }
+.test-case.passed { border-color: #28a745; background-color: #e9f7ed; }
+.test-case.failed { border-color: #dc3545; background-color: #fbe9ea; }
+.status-passed { color: #28a745; font-weight: bold; }
+.status-failed { color: #dc3545; font-weight: bold; }
+.error-message { color: #dc3545; white-space: pre-wrap; background-color: #fff; padding: 5px; border: 1px solid #f5c6cb; }
+.metrics { margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; }
+.chart-container { width: 80%; margin: 20px auto; }

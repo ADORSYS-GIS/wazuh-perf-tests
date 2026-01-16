@@ -2,17 +2,28 @@ import json
 import os
 import sys
 from pathlib import Path
+import html
+import shutil
 
 def generate_html_report(data, output_dir="test_report"):
+    """Generates an HTML report from test data and writes it to the output directory."""
     os.makedirs(output_dir, exist_ok=True)
+    
+    # Copy the stylesheet to the output directory
+    current_script_dir = Path(__file__).parent
+    stylesheet_path = current_script_dir / "style.css"
+    if stylesheet_path.exists():
+        shutil.copy(stylesheet_path, output_dir)
+    else:
+        print("Warning: style.css not found. Report will be unstyled.")
 
-    report_title = data.get("report_title", "Test Report")
-    test_run_id = data.get("test_run_id", "N/A")
-    timestamp = data.get("timestamp", "N/A")
-    environment = data.get("environment", {})
-    test_parameters = data.get("test_parameters", {})
-
-    css_path = os.path.join(output_dir, "style.css")
+    # --- Sanitize data for HTML injection ---
+    report_title = html.escape(data.get("report_title", "Test Report"))
+    test_run_id = html.escape(data.get("test_run_id", "N/A"))
+    timestamp = html.escape(data.get("timestamp", "N/A"))
+    
+    environment = {k: html.escape(str(v)) for k, v in data.get("environment", {}).items()}
+    test_parameters = {k: html.escape(str(v)) for k, v in data.get("test_parameters", {}).items()}
 
     html_content = f"""
     <!DOCTYPE html>
@@ -70,8 +81,8 @@ def generate_html_report(data, output_dir="test_report"):
     """
 
     for suite in data.get("test_suites", []):
-        suite_name = suite.get("name", "N/A")
-        suite_status = suite.get("status", "N/A")
+        suite_name = html.escape(suite.get("name", "N/A"))
+        suite_status = html.escape(suite.get("status", "N/A"))
         suite_duration = suite.get("duration", 0)
 
         html_content += f"""
@@ -79,12 +90,12 @@ def generate_html_report(data, output_dir="test_report"):
                 <h3>Test Suite: {suite_name} <span class="status-{suite_status}">{suite_status.upper()}</span> (Duration: {suite_duration:.2f}s)</h3>
                 <div class="details">
         """
-        for i, case in enumerate(suite.get("test_cases", [])):
-            case_name = case.get("name", "N/A")
-            case_status = case.get("status", "N/A")
+        for case in suite.get("test_cases", []):
+            case_name = html.escape(case.get("name", "N/A"))
+            case_status = html.escape(case.get("status", "N/A"))
             case_duration = case.get("duration", 0)
-            error_message = case.get("error_message", "")
-            metrics = case.get("metrics", {})
+            error_message = html.escape(case.get("error_message", ""))
+            metrics = {k: html.escape(str(v)) for k, v in case.get("metrics", {}).items()}
 
             html_content += f"""
                     <div class="test-case {case_status}">
@@ -94,7 +105,7 @@ def generate_html_report(data, output_dir="test_report"):
                         <div class="metrics">
             """
             for key, value in metrics.items():
-                html_content += f"            <p><strong>{key.replace('_', ' ').title()}:</strong> {value}</p>\n"
+                html_content += f"            <p><strong>{html.escape(key.replace('_', ' ').title())}:</strong> {value}</p>\n"
             html_content += """
                         </div>
             """
@@ -108,30 +119,8 @@ def generate_html_report(data, output_dir="test_report"):
     html_content += "</div></body></html>"
 
     report_path = os.path.join(output_dir, "index.html")
-    with open(report_path, "w") as f:
+    with open(report_path, "w", encoding="utf-8") as f:
         f.write(html_content)
-
-    css_content = """
-    body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
-    .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
-    h1, h2, h3 { color: #0056b3; }
-    h2, h3 { border-bottom: 1px solid #eee; padding-bottom: 5px; }
-    .summary, .test-suite { margin-bottom: 20px; border: 1px solid #ddd; border-radius: 5px; background-color: #f9f9f9; }
-    .summary p, .summary ul, .test-suite h3 { padding: 10px; margin: 0; }
-    .summary ul { list-style: none; padding-left: 0; }
-    .test-suite h3 { background-color: #d1ecf1; }
-    .details { padding: 10px; }
-    .test-case { margin-bottom: 10px; padding: 8px; border-left: 5px solid; }
-    .test-case.passed { border-color: #28a745; background-color: #e9f7ed; }
-    .test-case.failed { border-color: #dc3545; background-color: #fbe9ea; }
-    .status-passed { color: #28a745; font-weight: bold; }
-    .status-failed { color: #dc3545; font-weight: bold; }
-    .error-message { color: #dc3545; white-space: pre-wrap; background-color: #fff; padding: 5px; border: 1px solid #f5c6cb; }
-    .metrics { margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; }
-    .chart-container { width: 80%; margin: 20px auto; }
-    """
-    with open(css_path, "w") as f:
-        f.write(css_content)
 
     print(f"HTML report generated at: {report_path}")
 
@@ -140,15 +129,15 @@ if __name__ == "__main__":
         print("Usage: python generate_report.py <path_to_test_results.json>")
         sys.exit(1)
 
-    results_file = sys.argv
+    results_file = sys.argv[1]
 
     try:
-        with open(results_file[1], "r") as f:
+        with open(results_file, "r") as f:
             test_data = json.load(f)
 
         current_script_dir = Path(__file__).parent
-        output_dir = os.path.join(current_script_dir.parent, "output", "test_report")
-
+        output_dir = current_script_dir.parent / "output" / "test_report"
+        
         generate_html_report(test_data, output_dir=output_dir)
 
     except FileNotFoundError:

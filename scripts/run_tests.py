@@ -5,8 +5,8 @@ from pathlib import Path
 import os
 import datetime
 from kubernetes import client, config
-import numpy as np
 import sys
+import argparse
 
 def run_command(command, cwd=None, check=True):
     """Executes a command and returns its output."""
@@ -20,9 +20,9 @@ def run_command(command, cwd=None, check=True):
             raise subprocess.CalledProcessError(result.returncode, command, output=result.stdout, stderr=result.stderr)
     return result.stdout
 
-def wait_for_resources_to_be_ready(namespace, job_names=None, deployment_names=None, timeout=600):
+def wait_for_resources_to_be_ready(namespace, kubeconfig=None, context=None, job_names=None, deployment_names=None, timeout=600):
     """Waits for specified jobs to complete and deployments to be ready in a namespace."""
-    config.load_kube_config()
+    config.load_kube_config(config_file=kubeconfig, context=context)
     batch_api = client.BatchV1Api()
     apps_api = client.AppsV1Api()
 
@@ -72,12 +72,12 @@ def wait_for_resources_to_be_ready(namespace, job_names=None, deployment_names=N
                 raise TimeoutError(f"Deployment '{deployment_name}' did not become ready in {timeout} seconds.")
 
 
-def collect_logs(workloads):
+def collect_logs(workloads, kubeconfig=None, context=None):
     """
     Collects logs from specified workloads (jobs and deployments) by fetching logs from their pods.
     Each workload in the list should be a dictionary with 'name', 'selector', and 'namespace'.
     """
-    config.load_kube_config()
+    config.load_kube_config(config_file=kubeconfig, context=context)
     api = client.CoreV1Api()
     all_results = {}
 
@@ -88,6 +88,12 @@ def collect_logs(workloads):
         
         print(f"Collecting logs for: {name} in namespace {namespace} with selector {selector}")
         pod_list = api.list_namespaced_pod(namespace=namespace, label_selector=selector)
+        
+        if not pod_list.items:
+            print(f"  - WARNING: No pods found for selector '{selector}' in namespace '{namespace}'.")
+            all_results[name] = ""
+            continue
+
         logs = ""
         for pod in pod_list.items:
             try:
@@ -100,8 +106,36 @@ def collect_logs(workloads):
 
     return all_results
 
+def get_chaos_test_status(kubeconfig=None, context=None):
+    """Queries the Kubernetes API for the status of the NetworkChaos experiment."""
+    print("Checking status of Network Chaos experiment...")
+    try:
+        config.load_kube_config(config_file=kubeconfig, context=context)
+        custom_api = client.CustomObjectsApi()
+        
+        chaos_object = custom_api.get_namespaced_custom_object(
+            group="chaos-mesh.org",
+            version="v1alpha1",
+            namespace="tests",
+            plural="networkchaos",
+            name="network-delay-chaos"
+        )
+        
+        status = chaos_object.get("status", {}).get("experiment", {}).get("phase", "Unknown")
+        if status == "Finished":
+            return {"status": "passed", "error_message": ""}
+        else:
+            return {"status": "failed", "error_message": f"Chaos experiment ended with status: {status}"}
+            
+    except client.ApiException as e:
+        if e.status == 404:
+            return {"status": "failed", "error_message": "NetworkChaos custom object not found."}
+        return {"status": "failed", "error_message": f"API error checking chaos status: {e}"}
+    except Exception as e:
+        return {"status": "failed", "error_message": f"An unexpected error occurred while checking chaos status: {e}"}
 
-def parse_results_to_report_format(raw_results, test_duration):
+
+def parse_results_to_report_format(raw_results, test_duration, chaos_status):
     """Parses raw log data and formats it for the HTML report generator."""
     print("Parsing raw results into report format...")
     test_suites = []
@@ -109,27 +143,29 @@ def parse_results_to_report_format(raw_results, test_duration):
     # --- PARSING LOGIC FOR CPU STRESS TEST ---
     if "cpu-stress" in raw_results:
         logs = raw_results["cpu-stress"].strip().split('\n')
-        if logs and logs[-1]:
-            try:
-                metrics = json.loads(logs[-1])
-                status = "passed" if metrics.get("success") else "failed"
-                test_suites.append({
-                    "name": "CPU Stress Test", "status": status, "duration": metrics.get("actual_duration_seconds", 0),
-                    "test_cases": [{"name": "Verify performance under CPU load", "status": status, "duration": metrics.get("actual_duration_seconds", 0), "metrics": metrics, "error_message": metrics.get("error_message", "")}]
-                })
-            except (json.JSONDecodeError, IndexError):
-                status = "failed"
-                test_suites.append({
-                    "name": "CPU Stress Test", "status": status, "duration": test_duration,
-                    "test_cases": [{"name": "Parse CPU Stress Results", "status": status, "duration": test_duration, "metrics": {}, "error_message": f"Failed to parse JSON. Last log line: {logs[-1]}"}]
-                })
+        metrics = None
+        last_line = ""
+        for line in reversed(logs):
+            if line.strip():
+                try:
+                    metrics = json.loads(line)
+                    break 
+                except json.JSONDecodeError:
+                    last_line = line
+                    continue
+        
+        if metrics:
+            status = "passed" if metrics.get("success") else "failed"
+            test_suites.append({
+                "name": "CPU Stress Test", "status": status, "duration": metrics.get("actual_duration_seconds", 0),
+                "test_cases": [{"name": "Verify performance under CPU load", "status": status, "duration": metrics.get("actual_duration_seconds", 0), "metrics": metrics, "error_message": metrics.get("error_message", "")}]
+            })
         else:
             test_suites.append({
                 "name": "CPU Stress Test", "status": "failed", "duration": test_duration,
-                "test_cases": [{"name": "Find CPU Stress Logs", "status": "failed", "duration": test_duration, "metrics": {}, "error_message": "No logs found."}]
+                "test_cases": [{"name": "Parse CPU Stress Results", "status": "failed", "duration": test_duration, "metrics": {}, "error_message": f"Failed to parse JSON. Last non-empty log line: {last_line}" if last_line else "No logs found."}]
             })
 
-    # --- REPORTING FOR NETWORK CHAOS TEST ---
     # --- PARSING LOGIC FOR WAZUH POD LOGS ---
     wazuh_component_logs = {k: v for k, v in raw_results.items() if k.startswith("wazuh-helm-")}
     
@@ -152,23 +188,25 @@ def parse_results_to_report_format(raw_results, test_duration):
             "error_message": component_error_msg
         })
 
-    overall_wazuh_status = "passed" if total_wazuh_logs_collected > 0 else "failed"
-    overall_wazuh_error_msg = "No Wazuh logs collected from any component." if total_wazuh_logs_collected == 0 else ""
+    if wazuh_component_logs:
+        overall_wazuh_status = "passed" if total_wazuh_logs_collected > 0 else "failed"
+        overall_wazuh_error_msg = "No Wazuh logs collected from any component." if total_wazuh_logs_collected == 0 else ""
 
-    test_suites.append({
-        "name": "Wazuh Pod Log Collection",
-        "status": overall_wazuh_status,
-        "duration": test_duration,
-        "test_cases": wazuh_test_cases,
-        "metrics": {"total_wazuh_logs_collected": total_wazuh_logs_collected},
-        "error_message": overall_wazuh_error_msg
-    })
+        test_suites.append({
+            "name": "Wazuh Pod Log Collection",
+            "status": overall_wazuh_status,
+            "duration": test_duration,
+            "test_cases": wazuh_test_cases,
+            "metrics": {"total_wazuh_logs_collected": total_wazuh_logs_collected},
+            "error_message": overall_wazuh_error_msg
+        })
 
     # --- REPORTING FOR NETWORK CHAOS TEST ---
-    test_suites.append({
-        "name": "Network Delay Chaos Test", "status": "passed", "duration": 60,
-        "test_cases": [{"name": "Inject 100ms network delay", "status": "passed", "duration": 60, "metrics": {}, "error_message": ""}]
-    })
+    if chaos_status:
+        test_suites.append({
+            "name": "Network Delay Chaos Test", "status": chaos_status["status"], "duration": 60,
+            "test_cases": [{"name": "Inject 100ms network delay", "status": chaos_status["status"], "duration": 60, "metrics": {}, "error_message": chaos_status["error_message"]}]
+        })
 
     return {
         "report_title": "Wazuh Performance Test Report", "test_run_id": f"run-{int(time.time())}", "timestamp": datetime.datetime.now().isoformat(),
@@ -178,13 +216,21 @@ def parse_results_to_report_format(raw_results, test_duration):
 
 def main():
     """Main function to orchestrate the performance tests."""
+    parser = argparse.ArgumentParser(description="Wazuh Performance Test Orchestrator")
+    parser.add_argument('--skip-destroy', action='store_true', help="If set, skips the final 'terraform destroy' step.")
+    parser.add_argument('--test-duration', type=int, default=120, help="Duration of the test run in seconds.")
+    parser.add_argument('--enable-cpu-stress', action='store_true', help="Enable the CPU stress test module.")
+    parser.add_argument('--enable-network-chaos', action='store_true', help="Enable the network chaos test module.")
+    parser.add_argument('--kubeconfig', type=str, default=None, help="Path to the kubeconfig file.")
+    parser.add_argument('--context', type=str, default=None, help="The context to use from the kubeconfig file.")
+    parser.add_argument('--job-timeout', type=int, default=600, help="Timeout in seconds for waiting on Kubernetes jobs to complete.")
+    args = parser.parse_args()
+
     current_script_dir = Path(__file__).parent
     terraform_dir = current_script_dir.parent / "terraform"
     output_dir = current_script_dir.parent / "output"
     output_dir.mkdir(exist_ok=True)
     results_file = output_dir / "test_results.json"
-    
-    test_duration_seconds = 120
     
     try:
         print("--- Cleaning up previous Chaos Mesh installations (if any) ---")
@@ -195,50 +241,64 @@ def main():
         run_command(["terraform", "init"], cwd=terraform_dir)
 
         print("\n--- Applying Terraform Configuration ---")
-        run_command(["terraform", "apply", "-auto-approve",
-                     "-var", "enable_stress_cpu=true",
-                     "-var", "enable_chaos_network_delay=true"], cwd=terraform_dir)
+        apply_command = ["terraform", "apply", "-auto-approve"]
+        if args.enable_cpu_stress:
+            apply_command.append("-var=enable_stress_cpu=true")
+        if args.enable_network_chaos:
+            apply_command.append("-var=enable_chaos_network_delay=true")
+        
+        run_command(apply_command, cwd=terraform_dir)
 
         print("\n--- Waiting for workloads to stabilize and run ---")
-        # No deployments to wait for, only jobs and Wazuh pods (which are assumed to be running)
-        wait_for_resources_to_be_ready(namespace="tests", job_names=["cpu-stress"], deployment_names=[], timeout=180)
+        jobs_to_wait = []
+        if args.enable_cpu_stress:
+            jobs_to_wait.append("cpu-stress")
         
-        print(f"\n--- Running tests for {test_duration_seconds} seconds ---")
-        time.sleep(test_duration_seconds)
+        wait_for_resources_to_be_ready(
+            namespace="tests", 
+            job_names=jobs_to_wait, 
+            timeout=args.job_timeout,
+            kubeconfig=args.kubeconfig,
+            context=args.context
+        )
+        
+        print(f"\n--- Running tests for {args.test_duration} seconds ---")
+        time.sleep(args.test_duration)
         
         print("\n--- Collecting and Parsing Results ---")
-        # Collect logs from cpu-stress job and Wazuh pods
-        # Define workloads for log collection with their respective namespaces
         workloads_to_collect = [
-            {"name": "cpu-stress", "selector": "app=cpu-stress", "namespace": "tests"},
             {"name": "wazuh-helm-dashboard", "selector": "app=wazuh-helm-dashboard", "namespace": "wazuh"},
             {"name": "wazuh-helm-indexer", "selector": "app=wazuh-helm-indexer", "namespace": "wazuh"},
             {"name": "wazuh-helm-manager", "selector": "app=wazuh-helm-manager", "namespace": "wazuh"},
         ]
-        raw_results = collect_logs(workloads_to_collect)
+        if args.enable_cpu_stress:
+            workloads_to_collect.insert(0, {"name": "cpu-stress", "selector": "app=cpu-stress", "namespace": "tests"})
+
+        raw_results = collect_logs(workloads_to_collect, kubeconfig=args.kubeconfig, context=args.context)
         
-        # Add a small delay to ensure logs are available after job completion
-        print("Waiting 30 seconds for logs to become available...")
-        time.sleep(30)
+        chaos_status = None
+        if args.enable_network_chaos:
+            chaos_status = get_chaos_test_status(kubeconfig=args.kubeconfig, context=args.context)
         
-        report_data = parse_results_to_report_format(raw_results, test_duration_seconds)
+        report_data = parse_results_to_report_format(raw_results, args.test_duration, chaos_status)
         
         with open(results_file, "w") as f:
             json.dump(report_data, f, indent=2)
 
         print("\n--- Generating HTML Report ---")
         run_command(["python3", str(current_script_dir / "generate_report.py"), str(results_file)], cwd=current_script_dir.parent)
-        print("\nPerformance test run complete. Report generated in 'test_report' directory.")
+        print(f"\nPerformance test run complete. Report generated in '{output_dir / 'test_report'}'")
 
     except Exception as e:
         print(f"An unexpected error occurred: {e}", file=sys.stderr)
         sys.exit(1)
 
     finally:
-        print("\n--- Destroying Terraform Resources ---")
-        # To prevent accidental resource leakage during development, it's safer to run destroy manually for now.
-        # When ready, uncomment the line below.
-        run_command(["terraform", "destroy", "-auto-approve"], cwd=terraform_dir)
+        if not args.skip_destroy:
+            print("\n--- Destroying Terraform Resources ---")
+            run_command(["terraform", "destroy", "-auto-approve"], cwd=terraform_dir)
+        else:
+            print("\n--- Skipping Terraform Destroy ---")
 
 if __name__ == "__main__":
     main()

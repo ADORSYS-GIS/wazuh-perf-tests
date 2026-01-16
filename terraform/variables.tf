@@ -1,7 +1,7 @@
 variable "kube_config_path" {
   description = "Path to the Kubernetes config file. Can be set with KUBE_CONFIG_PATH environment variable."
   type        = string
-  default     = "~/.kube/k3s.yaml"
+  default     = "~/.kube/config"
 }
 
 variable "kube_config_context" {
@@ -60,10 +60,22 @@ variable "chaos_network_delay_config" {
   description = "Configuration for the Chaos Network Delay sub-module"
   type = object(
     {
-      target_namespace = optional(string, "wazuh")
+      target_namespace    = optional(string, "wazuh")
       pod_selector_labels = optional(map(string), {})
-      delay_duration = optional(string, "100ms")
+      delay_duration      = optional(string, "100ms")
     }
   )
   default = {}
+}
+
+variable "chaos_daemon_socket_path" {
+  description = "Socket path for the Chaos Daemon"
+  type        = string
+  default     = "/var/run/containerd/containerd.sock"
+}
+
+variable "chaos_daemon_runtime" {
+  description = "Container runtime for the Chaos Daemon"
+  type        = string
+  default     = "containerd"
 }
