@@ -238,10 +238,6 @@ def main():
     results_file = output_dir / "test_results.json"
     
     try:
-        print("--- Cleaning up previous Chaos Mesh installations (if any) ---")
-        run_command(["helm", "uninstall", "chaos-mesh", "--namespace", "chaos-mesh"], cwd=current_script_dir.parent, check=False)
-        run_command(["helm", "uninstall", "chaos-mesh", "--namespace", "chaos-testing"], cwd=current_script_dir.parent, check=False)
-
         print("\n--- Initializing Terraform ---")
         run_command(["terraform", "init"], cwd=terraform_dir)
 
