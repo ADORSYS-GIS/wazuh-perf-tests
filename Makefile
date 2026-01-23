@@ -1,4 +1,4 @@
-.PHONY: terraform-init terraform-apply terraform-destroy run-tests generate-report
+.PHONY: setup terraform-init terraform-apply terraform-destroy run-tests generate-report
 
 terraform-init:
 	terraform -chdir=terraform init
@@ -9,8 +9,11 @@ terraform-apply:
 terraform-destroy:
 	terraform -chdir=terraform destroy -auto-approve
 
-run-tests:
-	python3 scripts/run_tests.py
+setup:
+	pip install -r scripts/requirements.txt
+
+run-tests: setup
+	python3 scripts/run_tests.py --enable-cpu-stress --enable-network-chaos --test-duration 120
 
 generate-report:
 	python3 scripts/generate_report.py

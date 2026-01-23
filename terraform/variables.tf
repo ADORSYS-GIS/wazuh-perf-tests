@@ -10,17 +10,14 @@ variable "kube_config_context" {
   default     = null
 }
 
-
-
-
 variable "enable_stress_cpu" {
   description = "Enable the Stress CPU sub-module"
   type        = bool
   default     = false
 }
 
-variable "enable_chaos_network_delay" {
-  description = "Enable the Chaos Network Delay sub-module"
+variable "enable_chaos_network" {
+  description = "Enable the Chaos Network sub-module"
   type        = bool
   default     = false
 }
@@ -49,14 +46,25 @@ variable "stress_cpu_config" {
   default = {}
 }
 
-variable "chaos_network_delay_config" {
-  description = "Configuration for the Chaos Network Delay sub-module"
+variable "chaos_network_config" {
+  description = "Configuration for the Chaos Network sub-module"
   type = object(
     {
-      target_namespace    = optional(string, "wazuh")
-      pod_selector_labels = optional(map(string), {})
-      delay_duration      = optional(string, "100ms")
-      duration            = optional(string, "120s")
+      enable_service_account = optional(bool, false)
+      action                = optional(string, "delay")
+      target_namespace      = optional(string, "wazuh")
+      pod_selector_labels   = optional(map(string), {})
+      delay_duration        = optional(string, "100ms")
+      duration              = optional(string, "120s")
+      loss_percentage       = optional(string)
+      loss_correlation      = optional(string)
+      duplicate_percentage  = optional(string)
+      duplicate_correlation = optional(string)
+      corrupt_percentage    = optional(string)
+      corrupt_correlation   = optional(string)
+      bandwidth_rate        = optional(string)
+      bandwidth_limit       = optional(string)
+      bandwidth_buffer      = optional(string)
     }
   )
   default = {}

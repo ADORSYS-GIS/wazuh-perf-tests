@@ -5,6 +5,50 @@ import os
 import subprocess
 import sys
 import time
+import threading
+import csv
+
+try:
+    import psutil
+except ImportError:
+    psutil = None
+
+class MetricsCollector(threading.Thread):
+    def __init__(self, output_file="/tmp/metrics.csv", interval=1):
+        super().__init__()
+        self.output_file = output_file
+        self.interval = interval
+        self.stop_event = threading.Event()
+
+    def run(self):
+        if not psutil:
+            print("psutil not found, skipping background metrics collection.")
+            return
+
+        with open(self.output_file, 'w', newline='') as csvfile:
+            fieldnames = ['timestamp', 'cpu_percent', 'memory_percent', 'disk_read_bytes', 'disk_write_bytes']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            
+            while not self.stop_event.is_set():
+                try:
+                    cpu = psutil.cpu_percent(interval=None)
+                    mem = psutil.virtual_memory().percent
+                    disk = psutil.disk_io_counters()
+                    writer.writerow({
+                        'timestamp': time.time(),
+                        'cpu_percent': cpu,
+                        'memory_percent': mem,
+                        'disk_read_bytes': disk.read_bytes if disk else 0,
+                        'disk_write_bytes': disk.write_bytes if disk else 0
+                    })
+                    csvfile.flush()
+                except Exception as e:
+                    print(f"Error collecting metrics: {e}")
+                time.sleep(self.interval)
+
+    def stop(self):
+        self.stop_event.set()
 
 def run_stress_test(cpu_count, timeout_seconds):
     """
@@ -92,8 +136,16 @@ def main():
         print("Error: --timeout must be a positive integer.", file=sys.stderr)
         sys.exit(1)
 
-    metrics = run_stress_test(args.cpu_count, args.timeout)
-    print(json.dumps(metrics))
+    # Start metrics collection
+    collector = MetricsCollector()
+    collector.start()
+
+    try:
+        metrics = run_stress_test(args.cpu_count, args.timeout)
+        print(json.dumps(metrics))
+    finally:
+        collector.stop()
+        collector.join()
 
     if not metrics["success"]:
         sys.exit(1)

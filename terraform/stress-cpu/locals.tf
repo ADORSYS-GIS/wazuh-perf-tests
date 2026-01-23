@@ -6,7 +6,7 @@ locals {
     back_off_limit = 0
     command        = ["/bin/bash", "-c"]
     args = [
-      "apt-get update && apt-get install -y --no-install-recommends stress && python3 /app/stress_script.py --cpu-count ${var.cpu_count} --timeout ${var.duration_seconds}"
+      "apt-get update && apt-get install -y --no-install-recommends stress python3-pip && pip3 install psutil && python3 /app/stress_script.py --cpu-count ${var.cpu_count} --timeout ${var.duration_seconds}"
     ]
   }
 }

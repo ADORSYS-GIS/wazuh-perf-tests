@@ -5,11 +5,11 @@ output "network_chaos_name" {
 
 output "service_account_name" {
   description = "The name of the ServiceAccount token request."
-  value       = var.enable_chaos_service_account ? kubernetes_token_request_v1.service_account_token[0].metadata[0].name : null
+  value       = kubernetes_secret.service_account_token.metadata[0].name
 }
 
 output "service_account_token" {
   description = "The token generated for the ServiceAccount."
-  value       = var.enable_chaos_service_account ? kubernetes_token_request_v1.service_account_token[0].token : null
+  value       = kubernetes_secret.service_account_token.data["token"]
   sensitive   = true
 }
