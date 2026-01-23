@@ -105,7 +105,7 @@ def collect_logs(workloads, kubeconfig=None, context=None):
 
     return all_results
 
-def get_chaos_test_status(kubeconfig=None, context=None):
+def get_chaos_test_status(namespace, kubeconfig=None, context=None):
     """Queries the Kubernetes API for the status of the NetworkChaos experiment."""
     print("Checking status of Network Chaos experiment...")
     try:
@@ -115,7 +115,7 @@ def get_chaos_test_status(kubeconfig=None, context=None):
         chaos_object = custom_api.get_namespaced_custom_object(
             group="chaos-mesh.org",
             version="v1alpha1",
-            namespace="tests",
+            namespace=namespace,
             plural="networkchaos",
             name="network-delay-chaos"
         )
@@ -140,6 +140,49 @@ def get_chaos_test_status(kubeconfig=None, context=None):
         return {"status": "failed", "error_message": f"An unexpected error occurred while checking chaos status: {e}"}
 
 
+def _parse_cpu_stress_results(raw_logs, default_duration):
+    """Helper to parse CPU stress test logs."""
+    if not raw_logs:
+        return {
+            "name": "CPU Stress Test", "status": "failed", "duration": default_duration,
+            "test_cases": [{"name": "Parse CPU Stress Results", "status": "failed", "duration": default_duration, "metrics": {}, "error_message": "No logs found."}]
+        }
+
+    logs = raw_logs.strip().split('\n')
+    metrics = None
+    
+    # Robustly find the JSON line
+    for line in logs:
+        stripped_line = line.strip()
+        if stripped_line.startswith('{') and "load_average" in stripped_line:
+            try:
+                metrics = json.loads(stripped_line)
+                break
+            except json.JSONDecodeError:
+                continue
+    
+    if metrics:
+        status = "passed" if metrics.get("success") else "failed"
+        return {
+            "name": "CPU Stress Test", "status": status, "duration": metrics.get("actual_duration_seconds", 0),
+            "test_cases": [{"name": "Verify performance under CPU load", "status": status, "duration": metrics.get("actual_duration_seconds", 0), "metrics": metrics, "error_message": metrics.get("error_message", "")}]
+        }
+    else:
+        return {
+            "name": "CPU Stress Test", "status": "failed", "duration": default_duration,
+            "test_cases": [{"name": "Parse CPU Stress Results", "status": "failed", "duration": default_duration, "metrics": {}, "error_message": "Could not find a valid JSON result line with metrics."}]
+        }
+
+def _parse_network_chaos_results(chaos_status):
+    """Helper to format network chaos test results."""
+    if not chaos_status:
+        return None
+    
+    return {
+        "name": "Network Delay Chaos Test", "status": chaos_status["status"], "duration": 60,
+        "test_cases": [{"name": "Inject 100ms network delay", "status": chaos_status["status"], "duration": 60, "metrics": {}, "error_message": chaos_status["error_message"]}]
+    }
+
 def parse_results_to_report_format(raw_results, test_duration, chaos_status):
     """Parses raw log data and formats it for the HTML report generator."""
     print("Parsing raw results into report format...")
@@ -147,29 +190,7 @@ def parse_results_to_report_format(raw_results, test_duration, chaos_status):
 
     # --- PARSING LOGIC FOR CPU STRESS TEST ---
     if "cpu-stress" in raw_results:
-        logs = raw_results["cpu-stress"].strip().split('\n')
-        metrics = None
-        last_line = ""
-        for line in reversed(logs):
-            if line.strip():
-                try:
-                    metrics = json.loads(line)
-                    break 
-                except json.JSONDecodeError:
-                    last_line = line
-                    continue
-        
-        if metrics:
-            status = "passed" if metrics.get("success") else "failed"
-            test_suites.append({
-                "name": "CPU Stress Test", "status": status, "duration": metrics.get("actual_duration_seconds", 0),
-                "test_cases": [{"name": "Verify performance under CPU load", "status": status, "duration": metrics.get("actual_duration_seconds", 0), "metrics": metrics, "error_message": metrics.get("error_message", "")}]
-            })
-        else:
-            test_suites.append({
-                "name": "CPU Stress Test", "status": "failed", "duration": test_duration,
-                "test_cases": [{"name": "Parse CPU Stress Results", "status": "failed", "duration": test_duration, "metrics": {}, "error_message": f"Failed to parse JSON. Last non-empty log line: {last_line}" if last_line else "No logs found."}]
-            })
+        test_suites.append(_parse_cpu_stress_results(raw_results["cpu-stress"], test_duration))
 
     # --- PARSING LOGIC FOR WAZUH POD LOGS ---
     wazuh_component_logs = {k: v for k, v in raw_results.items() if k.startswith("wazuh-helm-")}
@@ -207,17 +228,21 @@ def parse_results_to_report_format(raw_results, test_duration, chaos_status):
         })
 
     # --- REPORTING FOR NETWORK CHAOS TEST ---
-    if chaos_status:
-        test_suites.append({
-            "name": "Network Delay Chaos Test", "status": chaos_status["status"], "duration": 60,
-            "test_cases": [{"name": "Inject 100ms network delay", "status": chaos_status["status"], "duration": 60, "metrics": {}, "error_message": chaos_status["error_message"]}]
-        })
+    network_chaos_result = _parse_network_chaos_results(chaos_status)
+    if network_chaos_result:
+        test_suites.append(network_chaos_result)
 
     return {
         "report_title": "Wazuh Performance Test Report", "test_run_id": f"run-{int(time.time())}", "timestamp": datetime.datetime.now().isoformat(),
         "environment": {"os": "Linux", "cpu": "Dynamic", "memory": "Dynamic"}, "test_parameters": {"duration_minutes": test_duration / 60},
         "test_suites": test_suites
     }
+
+def get_terraform_outputs(terraform_dir):
+    """Fetches outputs from Terraform in JSON format."""
+    print("Fetching Terraform outputs...")
+    output = run_command(["terraform", "output", "-json"], cwd=terraform_dir)
+    return json.loads(output)
 
 def main():
     """Main function to orchestrate the performance tests."""
@@ -251,13 +276,17 @@ def main():
         run_command(apply_command, cwd=terraform_dir)
 
         print("\n--- Waiting for workloads to stabilize and run ---")
+        tf_outputs = get_terraform_outputs(terraform_dir)
+        test_namespace = tf_outputs.get("namespace", {}).get("value", "tests")
+        print(f"Using test namespace: {test_namespace}")
+
         jobs_to_wait = []
         if args.enable_cpu_stress:
             jobs_to_wait.append("cpu-stress")
         
         wait_for_resources_to_be_ready(
-            namespace="tests", 
-            job_names=jobs_to_wait, 
+            namespace=test_namespace,
+            job_names=jobs_to_wait,
             timeout=args.job_timeout,
             kubeconfig=args.kubeconfig,
             context=args.context
@@ -268,18 +297,16 @@ def main():
         
         print("\n--- Collecting and Parsing Results ---")
         workloads_to_collect = [
-            {"name": "wazuh-helm-dashboard", "selector": "app=wazuh-helm-dashboard", "namespace": "wazuh"},
-            {"name": "wazuh-helm-indexer", "selector": "app=wazuh-helm-indexer", "namespace": "wazuh"},
-            {"name": "wazuh-helm-manager", "selector": "app=wazuh-helm-manager", "namespace": "wazuh"},
+            {"name": "wazuh-helm-pods", "selector": "app.kubernetes.io/name=wazuh-helm", "namespace": "wazuh"},
         ]
         if args.enable_cpu_stress:
-            workloads_to_collect.insert(0, {"name": "cpu-stress", "selector": "app=cpu-stress", "namespace": "tests"})
+            workloads_to_collect.insert(0, {"name": "cpu-stress", "selector": "app=cpu-stress", "namespace": test_namespace})
 
         raw_results = collect_logs(workloads_to_collect, kubeconfig=args.kubeconfig, context=args.context)
         
         chaos_status = None
         if args.enable_network_chaos:
-            chaos_status = get_chaos_test_status(kubeconfig=args.kubeconfig, context=args.context)
+            chaos_status = get_chaos_test_status(test_namespace, kubeconfig=args.kubeconfig, context=args.context)
         
         report_data = parse_results_to_report_format(raw_results, args.test_duration, chaos_status)
         

@@ -20,7 +20,7 @@ resource "helm_release" "chaos_mesh" {
 
   set {
     name  = "debug"
-    value = "true"
+    value = var.chaos_mesh_debug
   }
 }
 
@@ -32,26 +32,23 @@ resource "kubernetes_namespace" "tests" {
 
 
 module "stress_cpu" {
-  count  = var.enable_stress_cpu ? 1 : 0
-  source = "./stress-cpu"
+  count            = var.enable_stress_cpu ? 1 : 0
+  source           = "./stress-cpu"
+  cpu_count        = var.stress_cpu_config.cpu_count
+  duration_seconds = var.stress_cpu_config.duration_seconds
 
   namespace = kubernetes_namespace.tests.metadata[0].name
-  config    = var.stress_cpu_config
 }
 
 module "chaos_network_delay" {
   count  = var.enable_chaos_network_delay ? 1 : 0
   source = "./chaos-network-delay"
 
-  namespace = kubernetes_namespace.tests.metadata[0].name
-  latency  = var.chaos_network_delay_config.delay_duration
-  duration = "60s" # This was not in the config, so I'll hardcode it for now.
+  namespace        = kubernetes_namespace.tests.metadata[0].name
+  latency          = var.chaos_network_delay_config.delay_duration
+  duration         = var.chaos_network_delay_config.duration
   target_namespace = var.chaos_network_delay_config.target_namespace
 
   depends_on = [helm_release.chaos_mesh]
 }
 
-output "namespace_name" {
-  description = "The name of the Kubernetes namespace created for tests"
-  value       = kubernetes_namespace.tests.metadata[0].name
-}

@@ -33,3 +33,15 @@ variable "enable_chaos_service_account" {
   type        = bool
   default     = false
 }
+
+variable "action" {
+  description = "The action to perform."
+  type        = string
+  default     = "delay"
+}
+
+variable "mode" {
+  description = "The mode of the chaos experiment."
+  type        = string
+  default     = "all"
+}

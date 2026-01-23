@@ -17,8 +17,8 @@ resource "kubernetes_manifest" "network_chaos" {
       "namespace" = var.namespace
     }
     "spec" = {
-      "action" = "delay"
-      "mode"   = "all"
+      "action" = var.action
+      "mode"   = var.mode
       "selector" = {
         "namespaces" = [
           var.namespace

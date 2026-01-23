@@ -94,7 +94,7 @@ def generate_html_report(data, output_dir="test_report"):
             case_name = html.escape(case.get("name", "N/A"))
             case_status = html.escape(case.get("status", "N/A"))
             case_duration = case.get("duration", 0)
-            error_message = html.escape(case.get("error_message", ""))
+            error_message = html.escape(case.get("error_message") or "")
             metrics = {k: html.escape(str(v)) for k, v in case.get("metrics", {}).items()}
 
             html_content += f"""
