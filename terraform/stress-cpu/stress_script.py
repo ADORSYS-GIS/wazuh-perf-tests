@@ -1,5 +1,6 @@
 import argparse
 import json
+import multiprocessing
 import os
 import subprocess
 import sys
@@ -62,19 +63,26 @@ def main():
     env_timeout = os.environ.get("STRESS_TIMEOUT_SECONDS")
 
     parser.add_argument(
-        "--cpu-count", 
-        type=int, 
-        default=int(env_cpu_count) if env_cpu_count and env_cpu_count.isdigit() else 1,
-        help="Number of CPU workers to spawn."
+        "--cpu-count",
+        type=int,
+        default=int(env_cpu_count) if env_cpu_count and env_cpu_count.isdigit() else None,
+        help="Number of CPU workers to spawn. Defaults to all available CPUs if not specified."
     )
     parser.add_argument(
-        "--timeout", 
-        type=int, 
+        "--timeout",
+        type=int,
         default=int(env_timeout) if env_timeout and env_timeout.isdigit() else 60,
         help="Timeout in seconds for the stress test."
     )
 
     args = parser.parse_args()
+
+    # CPU auto-detection logic
+    if args.cpu_count is None:
+        try:
+            args.cpu_count = multiprocessing.cpu_count()
+        except NotImplementedError:
+            args.cpu_count = 1
 
     # Input validation
     if args.cpu_count <= 0:

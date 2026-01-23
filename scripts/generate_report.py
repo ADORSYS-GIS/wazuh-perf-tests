@@ -66,7 +66,7 @@ def generate_html_report(data, output_dir="test_report"):
         <script>
             var ctx = document.getElementById('testCaseChart').getContext('2d');
             new Chart(ctx, {{
-                type: 'bar',
+                type: 'pie',
                 data: {{
                     labels: ['Passed', 'Failed'],
                     datasets: [{{
@@ -75,7 +75,17 @@ def generate_html_report(data, output_dir="test_report"):
                         backgroundColor: ['#28a745', '#dc3545']
                     }}]
                 }},
-                options: {{ responsive: true, scales: {{ y: {{ beginAtZero: true }} }} }}
+                options: {{
+                    responsive: true,
+                    plugins: {{
+                        legend: {{
+                            position: 'top',
+                        }},
+                        title: {{
+                            display: false
+                        }}
+                    }}
+                }}
             }});
         </script>
     """
