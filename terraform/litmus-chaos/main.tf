@@ -46,30 +46,30 @@ resource "helm_release" "litmus" {
 
 }
 
-resource "helm_release" "litmus_experiments" {
-  name             = "${var.namespace}-experiments"
-  repository       = "https://litmuschaos.github.io/litmus-helm"
-  chart            = "kubernetes-chaos"
-  namespace        = var.namespace
-  create_namespace = true
-  version          = "3.25.0"
-  timeout          = 300
-  wait             = true
+# resource "helm_release" "litmus_experiments" {
+#   name             = "${var.namespace}-experiments"
+#   repository       = "https://litmuschaos.github.io/litmus-helm"
+#   chart            = "kubernetes-chaos"
+#   namespace        = var.namespace
+#   create_namespace = true
+#   version          = "3.25.0"
+#   timeout          = 300
+#   wait             = true
 
-  set {
-    name  = "environment.runtime"
-    value = var.runtime_environment
-  }
+#   set {
+#     name  = "environment.runtime"
+#     value = var.runtime_environment
+#   }
 
-  set {
-    name  = "environment.socketPath"
-    value = var.runtime_socket_path
-  }
+#   set {
+#     name  = "environment.socketPath"
+#     value = var.runtime_socket_path
+#   }
 
-  set {
-    name  = "installCRDs"
-    value = "true"
-  }
+#   set {
+#     name  = "installCRDs"
+#     value = "true"
+#   }
 
-  depends_on = [helm_release.litmus]
-}
+#   depends_on = [helm_release.litmus]
+# }

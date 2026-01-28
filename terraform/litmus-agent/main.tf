@@ -11,7 +11,7 @@ resource "helm_release" "litmus_agent" {
 
   set {
     name  = "installCRDs"
-    value = "false"
+    value = "true"
   }
 
   set {
