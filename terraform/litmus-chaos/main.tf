@@ -57,6 +57,16 @@ resource "helm_release" "litmus_experiments" {
   wait             = true
 
   set {
+    name  = "environment.runtime"
+    value = var.runtime_environment
+  }
+
+  set {
+    name  = "environment.socketPath"
+    value = var.runtime_socket_path
+  }
+
+  set {
     name  = "installCRDs"
     value = "true"
   }

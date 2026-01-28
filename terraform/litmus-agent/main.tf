@@ -1,27 +1,27 @@
 resource "helm_release" "litmus_agent" {
   name             = "${var.namespace}-agent"
-  repository       = "https://litmuschaos.github.io/litmus-helm"
+  repository       = "litmuschaos"
   chart            = "litmus-agent"
   namespace        = var.namespace
   create_namespace = true
   version          = "3.24.0"
   timeout          = 300
   wait             = true
-  skip_crds        = true
+  wait_for_jobs    = true
 
   set {
     name  = "installCRDs"
-    value = var.install_crds ? "true" : "false"
+    value = "false"
   }
 
   set {
     name  = "LITMUS_URL"
-    value = "http://litmus-frontend-service.${var.namespace}.svc.cluster.local:9091"
+    value = "http://litmus-chaos-frontend-service.${var.namespace}.svc.cluster.local:9091"
   }
 
   set {
     name  = "LITMUS_BACKEND_URL"
-    value = "http://litmus-server-service.${var.namespace}.svc.cluster.local:9002"
+    value = "http://litmus-chaos-server-service.${var.namespace}.svc.cluster.local:9002"
 
   }
 
@@ -49,8 +49,19 @@ resource "helm_release" "litmus_agent" {
     name  = "LITMUS_USERNAME"
     value = var.litmus_admin_username
   }
+
   set {
     name  = "LITMUS_PASSWORD"
     value = var.litmus_admin_password
+  }
+
+  set {
+    name  = "LITMUS_ENVIRONMENT_ID"
+    value = var.litmus_environment
+  }
+
+  set {
+    name  = "INFRA_NAME"
+    value = var.litmus_environment
   }
 }

@@ -14,3 +14,13 @@ variable "litmus_admin_password" {
   type        = string
   sensitive   = true
 }
+
+variable "runtime_environment" {
+  description = "Runtime environment"
+  type        = string
+}
+
+variable "runtime_socket_path" {
+  description = "Runtime environment socker path"
+  type        = string
+}

@@ -61,19 +61,11 @@ variable "app_label" {
 variable "chaos_service_account" {
   description = "Service account for LitmusChaos experiments"
   type        = string
-  default     = "litmus"
 }
 
 variable "project_id" {
   description = "Project ID for LitmusChaos"
   type        = string
-}
-
-
-variable "litmus_project_name" {
-  description = "Name of the LitmusChaos project to create"
-  type        = string
-  default     = "default-project"
 }
 
 variable "litmus_admin_username" {
@@ -93,4 +85,21 @@ variable "litmus_namespace" {
   description = "Kubernetes namespace where LitmusChaos will be installed"
   type        = string
   default     = "litmus"
+}
+
+variable "runtime_environment" {
+  description = "Runtime environment"
+  type        = string
+  default     = "containerd"
+}
+
+variable "runtime_socket_path" {
+  description = "Runtime environment socker path"
+  type        = string
+  default     = "/k3s/containerd/containerd.sock"
+}
+
+variable "litmus_environment" {
+  description = "Environment ID for LitmusChaos"
+  type        = string
 }

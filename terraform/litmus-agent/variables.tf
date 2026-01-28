@@ -32,8 +32,7 @@ variable "platform" {
   default     = "Rancher"
 }
 
-variable "install_crds" {
-  description = "Install CDRs for litmus."
-  type        = bool
-  default     = false
+variable "litmus_environment" {
+  description = "Environment ID for LitmusChaos"
+  type        = string
 }
