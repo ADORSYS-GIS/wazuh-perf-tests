@@ -13,7 +13,7 @@ setup:
 	pip install -r scripts/requirements.txt
 
 run-tests: setup
-	python3 scripts/run_tests.py --enable-cpu-stress --enable-network-chaos --test-duration 120
+	python3 scripts/run_tests.py
 
 generate-report:
 	python3 scripts/generate_report.py

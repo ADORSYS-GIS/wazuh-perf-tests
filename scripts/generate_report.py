@@ -97,7 +97,7 @@ def generate_graphs(run_dir):
 
     return generated_images
 
-def generate_html_report(data, run_dir, images, logs):
+def generate_html_report(data, run_dir, images):
     """Generates an HTML report from test data and writes it to the run directory."""
     run_path = Path(run_dir)
     
@@ -152,22 +152,6 @@ def generate_html_report(data, run_dir, images, logs):
             </div>
     """
 
-    # Cluster Health / Logs Section
-    if logs:
-        html_content += """
-            <div class="section">
-                <h2>Cluster Logs</h2>
-                <ul>
-        """
-        for log in logs:
-            log_name = Path(log).name
-            # Relative path to logs inside the run dir
-            rel_log_path = f"wazuh/{log_name}"
-            html_content += f'<li><a href="{rel_log_path}" target="_blank">{log_name}</a></li>'
-        html_content += """
-                </ul>
-            </div>
-        """
 
     # Performance Graphs Section
     if images:
@@ -224,6 +208,9 @@ def generate_html_report(data, run_dir, images, logs):
         </script>
     """
 
+    # Collect load average metrics for a dedicated section
+    load_average_data = []
+
     for suite in data.get("test_suites", []):
         suite_name = html.escape(suite.get("name", "N/A"))
         suite_status = html.escape(suite.get("status", "N/A"))
@@ -241,24 +228,44 @@ def generate_html_report(data, run_dir, images, logs):
             error_message = html.escape(case.get("error_message") or "")
             metrics = {k: html.escape(str(v)) for k, v in case.get("metrics", {}).items()}
 
+            # Capture load average at end if present
+            raw_load = case.get("metrics", {}).get("load_average_at_end")
+            if raw_load is not None:
+                load_average_data.append((case_name, raw_load))
+
             html_content += f"""
-                    <div class="test-case {case_status}">
-                        <p><strong>Test Case:</strong> {case_name}</p>
-                        <p><strong>Status:</strong> <span class="status-{case_status}">{case_status.upper()}</span></p>
-                        <p><strong>Duration:</strong> {case_duration:.2f}s</p>
-                        <div class="metrics">
+                <div class="test-case {case_status}">
+                    <p><strong>Test Case:</strong> {case_name}</p>
+                    <p><strong>Status:</strong> <span class="status-{case_status}">{case_status.upper()}</span></p>
+                    <p><strong>Duration:</strong> {case_duration:.2f}s</p>
+                    <div class="metrics">
             """
             for key, value in metrics.items():
                 html_content += f"            <p><strong>{html.escape(key.replace('_', ' ').title())}:</strong> {value}</p>\n"
             html_content += """
-                        </div>
+                    </div>
             """
             if error_message:
                 html_content += f"""
-                        <pre class="error-message">Error: {error_message}</pre>
-                """
+                    <pre class="error-message">Error: {error_message}</pre>
+            """
             html_content += "</div>"
         html_content += "</div></div>"
+
+    # Add a dedicated Load Average section if data exists
+    if load_average_data:
+        html_content += """
+            <div class="section">
+                <h2>Load Average at End</h2>
+                <table class="load-average-table">
+                    <tr><th>Test Case</th><th>Load Average (1m, 5m, 15m)</th></tr>
+        """
+        for case_name, load_val in load_average_data:
+            html_content += f"<tr><td>{case_name}</td><td>{html.escape(str(load_val))}</td></tr>"
+        html_content += """
+                </table>
+            </div>
+        """
 
     html_content += "</div></body></html>"
 
@@ -306,11 +313,8 @@ if __name__ == "__main__":
         # Generate graphs
         images = generate_graphs(run_dir)
         
-        # Collect logs
-        log_files = list((run_dir / "wazuh").glob("*.log"))
-        
         # Generate HTML report inside the run directory
-        generate_html_report(test_data, run_dir, images, log_files)
+        generate_html_report(test_data, run_dir, images)
 
     except Exception as e:
         print(f"An error occurred: {e}")

@@ -10,80 +10,62 @@ variable "kube_config_context" {
   default     = null
 }
 
-variable "enable_stress_cpu" {
-  description = "Enable the Stress CPU sub-module"
+variable "enable_chaos_pod_delete" {
+  description = "Enable the LitmusChaos Pod Delete experiment"
   type        = bool
   default     = false
 }
 
-variable "enable_chaos_network" {
-  description = "Enable the Chaos Network sub-module"
+variable "enable_chaos_network_latency" {
+  description = "Enable the LitmusChaos Network Latency experiment"
   type        = bool
   default     = false
 }
 
-variable "wazuh_log_generator_config" {
-  description = "Configuration for the Wazuh Log Generator sub-module"
-  type = object(
-    {
-      log_script_content = optional(string, "print('Generating logs...')")
-      image              = optional(string, "python:3.9-slim-buster")
-      command            = optional(list(string), ["python", "/app/loggen.py"])
-      replicas           = optional(number, 1)
-    }
-  )
-  default = {}
+variable "enable_chaos_cpu_stress" {
+  description = "Enable the LitmusChaos CPU Stress experiment"
+  type        = bool
+  default     = false
 }
 
-variable "stress_cpu_config" {
-  description = "Configuration for the Stress CPU sub-module"
-  type = object(
-    {
-      cpu_count        = optional(number, 1)
-      duration_seconds = optional(number, 60)
-    }
-  )
-  default = {}
+variable "enable_chaos_disk_stress" {
+  description = "Enable the LitmusChaos Disk Stress experiment"
+  type        = bool
+  default     = false
 }
 
-variable "chaos_network_config" {
-  description = "Configuration for the Chaos Network sub-module"
-  type = object(
-    {
-      enable_service_account = optional(bool, false)
-      action                = optional(string, "delay")
-      target_namespace      = optional(string, "wazuh")
-      pod_selector_labels   = optional(map(string), {})
-      delay_duration        = optional(string, "100ms")
-      duration              = optional(string, "120s")
-      loss_percentage       = optional(string)
-      loss_correlation      = optional(string)
-      duplicate_percentage  = optional(string)
-      duplicate_correlation = optional(string)
-      corrupt_percentage    = optional(string)
-      corrupt_correlation   = optional(string)
-      bandwidth_rate        = optional(string)
-      bandwidth_limit       = optional(string)
-      bandwidth_buffer      = optional(string)
-    }
-  )
-  default = {}
+variable "enable_chaos_memory_stress" {
+  description = "Enable the LitmusChaos Memory Stress experiment"
+  type        = bool
+  default     = false
 }
 
-variable "chaos_daemon_socket_path" {
-  description = "Socket path for the Chaos Daemon"
-  type        = string
-  default     = "/var/run/containerd/containerd.sock"
-}
-
-variable "chaos_daemon_runtime" {
-  description = "Container runtime for the Chaos Daemon"
-  type        = string
-  default     = "containerd"
-}
-
-variable "chaos_mesh_debug" {
-  description = "Enable debug mode for Chaos Mesh"
+variable "enable_litmuschaos" {
+  description = "Enable the LitmusChaos framework installation"
   type        = bool
   default     = true
+}
+
+variable "tests_namespace" {
+  description = "Kubernetes namespace where the tests will be deployed"
+  type        = string
+  default     = "tests"
+}
+
+variable "namespace" {
+  description = "Kubernetes namespace where the Wazuh application is deployed"
+  type        = string
+  default     = "wazuh"
+}
+
+variable "wazuh_app_label" {
+  description = "Label used to identify the Wazuh application pods"
+  type        = string
+  default     = "app.kubernetes.io/name=wazuh-helm"
+}
+
+variable "chaos_service_account" {
+  description = "Service account for LitmusChaos experiments"
+  type        = string
+  default     = "litmus"
 }
