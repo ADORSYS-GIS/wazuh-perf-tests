@@ -1,106 +1,74 @@
-resource "kubernetes_namespace" "tests" {
-  metadata {
-    name = var.tests_namespace
-  }
+module "litmus_chaos" {
+  source                = "./litmus-chaos"
+  namespace             = var.litmus_namespace
+  litmus_admin_username = var.litmus_admin_username
+  litmus_admin_password = var.litmus_admin_password
 }
 
-module "litmuschaos" {
-  source = "./litmuschaos"
+module "litmus_agent" {
+  source                = "./litmus-agent"
+  project_id            = var.project_id
+  install_crds          = true
+  litmus_admin_username = var.litmus_admin_username
+  litmus_admin_password = var.litmus_admin_password
+  namespace             = var.litmus_namespace
 
-  # depends_on = [module.litmuschaos]
+  depends_on = [module.litmus_chaos]
 }
+
 
 module "chaos_pod_delete" {
-  count           = var.enable_chaos_pod_delete ? 1 : 0
-  source          = "./chaos-pod-delete"
-  depends_on_crds = module.litmuschaos.litmus_crds_ready
+  count                 = var.enable_chaos_pod_delete ? 1 : 0
+  source                = "./chaos-pod-delete"
+  depends_on_crds       = module.litmus_chaos.litmus_crds_ready
+  app_namespace         = var.app_namespace
+  app_label             = var.app_label
+  chaos_service_account = var.chaos_service_account
 
-  depends_on = [module.litmuschaos]
+  depends_on = [module.litmus_chaos]
 }
 
 module "chaos_network_latency" {
-  count           = var.enable_chaos_network_latency ? 1 : 0
-  source          = "./chaos-network-latency"
-  depends_on_crds = module.litmuschaos.litmus_crds_ready
+  count                 = var.enable_chaos_network_latency ? 1 : 0
+  source                = "./chaos-network-latency"
+  depends_on_crds       = module.litmus_chaos.litmus_crds_ready
+  app_namespace         = var.app_namespace
+  app_label             = var.app_label
+  chaos_service_account = var.chaos_service_account
 
-  # depends_on = [module.litmuschaos]
+  depends_on = [module.litmus_chaos]
 }
 
 module "chaos_cpu_stress" {
-  count           = var.enable_chaos_cpu_stress ? 1 : 0
-  source          = "./chaos-cpu-stress"
-  depends_on_crds = module.litmuschaos.litmus_crds_ready
+  count                 = var.enable_chaos_cpu_stress ? 1 : 0
+  source                = "./chaos-cpu-stress"
+  depends_on_crds       = module.litmus_chaos.litmus_crds_ready
+  app_namespace         = var.app_namespace
+  app_label             = var.app_label
+  chaos_service_account = var.chaos_service_account
 
-  # depends_on = [module.litmuschaos]
+
+  depends_on = [module.litmus_chaos]
 }
 
 module "chaos_disk_stress" {
-  count           = var.enable_chaos_disk_stress ? 1 : 0
-  source          = "./chaos-disk-stress"
-  depends_on_crds = module.litmuschaos.litmus_crds_ready
+  count                 = var.enable_chaos_disk_stress ? 1 : 0
+  source                = "./chaos-disk-stress"
+  depends_on_crds       = module.litmus_chaos
+  app_namespace         = var.app_namespace
+  app_label             = var.app_label
+  chaos_service_account = var.chaos_service_account
 
-  # depends_on = [module.litmuschaos]
+  depends_on = [module.litmus_chaos]
 }
 
 module "chaos_memory_stress" {
-  count           = var.enable_chaos_memory_stress ? 1 : 0
-  source          = "./chaos-memory-stress"
-  depends_on_crds = module.litmuschaos.litmus_crds_ready
-
-  # depends_on = [module.litmuschaos]
-}
-
-module "chaos_engine_pod_delete" {
-  count = var.enable_chaos_pod_delete ? 1 : 0
-  source = "./chaos-engine"
-  chaos_engine_name = "wazuh-pod-delete-chaos"
-  app_namespace = var.namespace
-  app_label = var.wazuh_app_label
-  experiment_name = module.chaos_pod_delete[0].experiment_name
+  count                 = var.enable_chaos_memory_stress ? 1 : 0
+  source                = "./chaos-memory-stress"
+  depends_on_crds       = module.litmus_chaos
+  app_namespace         = var.app_namespace
+  app_label             = var.app_label
   chaos_service_account = var.chaos_service_account
-  depends_on = [module.chaos_pod_delete]
-}
 
-module "chaos_engine_network_latency" {
-  count = var.enable_chaos_network_latency ? 1 : 0
-  source = "./chaos-engine"
-  chaos_engine_name = "wazuh-network-latency-chaos"
-  app_namespace = var.namespace
-  app_label = var.wazuh_app_label
-  experiment_name = module.chaos_network_latency[0].experiment_name
-  chaos_service_account = var.chaos_service_account
-  depends_on = [module.chaos_network_latency]
-}
-
-module "chaos_engine_cpu_stress" {
-  count = var.enable_chaos_cpu_stress ? 1 : 0
-  source = "./chaos-engine"
-  chaos_engine_name = "wazuh-cpu-stress-chaos"
-  app_namespace = var.namespace
-  app_label = var.wazuh_app_label
-  experiment_name = module.chaos_cpu_stress[0].experiment_name
-  chaos_service_account = var.chaos_service_account
-  depends_on = [module.chaos_cpu_stress]
-}
-
-module "chaos_engine_disk_stress" {
-  count = var.enable_chaos_disk_stress ? 1 : 0
-  source = "./chaos-engine"
-  chaos_engine_name = "wazuh-disk-stress-chaos"
-  app_namespace = var.namespace
-  app_label = var.wazuh_app_label
-  experiment_name = module.chaos_disk_stress[0].experiment_name
-  chaos_service_account = var.chaos_service_account
-  depends_on = [module.chaos_disk_stress]
-}
-
-module "chaos_engine_memory_stress" {
-  count = var.enable_chaos_memory_stress ? 1 : 0
-  source = "./chaos-engine"
-  chaos_engine_name = "wazuh-memory-stress-chaos"
-  app_namespace = var.namespace
-  app_label = var.wazuh_app_label
-  experiment_name = module.chaos_memory_stress[0].experiment_name
-  chaos_service_account = var.chaos_service_account
-  depends_on = [module.chaos_memory_stress]
+  depends_on = [module.litmus_chaos]
 }

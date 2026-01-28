@@ -46,19 +46,13 @@ variable "enable_litmuschaos" {
   default     = true
 }
 
-variable "tests_namespace" {
-  description = "Kubernetes namespace where the tests will be deployed"
-  type        = string
-  default     = "tests"
-}
-
-variable "namespace" {
+variable "app_namespace" {
   description = "Kubernetes namespace where the Wazuh application is deployed"
   type        = string
   default     = "wazuh"
 }
 
-variable "wazuh_app_label" {
+variable "app_label" {
   description = "Label used to identify the Wazuh application pods"
   type        = string
   default     = "app.kubernetes.io/name=wazuh-helm"
@@ -66,6 +60,37 @@ variable "wazuh_app_label" {
 
 variable "chaos_service_account" {
   description = "Service account for LitmusChaos experiments"
+  type        = string
+  default     = "litmus"
+}
+
+variable "project_id" {
+  description = "Project ID for LitmusChaos"
+  type        = string
+}
+
+
+variable "litmus_project_name" {
+  description = "Name of the LitmusChaos project to create"
+  type        = string
+  default     = "default-project"
+}
+
+variable "litmus_admin_username" {
+  description = "LitmusChaos admin username"
+  type        = string
+  default     = "admin"
+}
+
+variable "litmus_admin_password" {
+  description = "LitmusChaos admin password"
+  type        = string
+  sensitive   = true
+  default     = "litmus"
+}
+
+variable "litmus_namespace" {
+  description = "Kubernetes namespace where LitmusChaos will be installed"
   type        = string
   default     = "litmus"
 }
